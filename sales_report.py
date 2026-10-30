@@ -16,8 +16,8 @@ def create_sales_report(input_file, output_folder):
         print(f"Error: '{input_file}' is empty.")
         return
     if df.empty:
-            print(f"Error: '{input_file}' has headers but no sales records.")
-            return
+        print(f"Error: '{input_file}' has headers but no sales records.")
+        return
 
 
     required_columns = {
