@@ -1,0 +1,64 @@
+order_id,product,quantity,price
+5001,Notebook,2,50
+5002,Pen,5,10
+5003,Pencil,10,5
+5004,School Bag,1,850
+5005,Ruler,3,20
+5006,Eraser,4,8
+5007,Marker,2,25
+5008,Geometry Box,1,150
+5009,Drawing Book,3,80
+5010,Water Bottle,2,120
+5011,Notebook,4,50
+5012,Pen,8,10
+5013,Pencil,12,5
+5014,School Bag,2,850
+5015,Ruler,5,20
+5016,Eraser,6,8
+5017,Marker,3,25
+5018,Geometry Box,2,150
+5019,Drawing Book,4,80
+5020,Water Bottle,3,120
+5021,Notebook,1,50
+5022,Pen,10,10
+5023,Pencil,20,5
+5024,School Bag,1,850
+5025,Ruler,2,20
+5026,Eraser,10,8
+5027,Marker,4,25
+5028,Geometry Box,3,150
+5029,Drawing Book,2,80
+5030,Water Bottle,1,120
+5031,Stapler,2,45
+5032,File Folder,5,25
+5033,Calculator,1,350
+5034,Highlighter,4,30
+5035,Glue Stick,3,15
+5036,School Shoes,1,650
+5037,Backpack,1,400
+5038,Notebook,6,50
+5039,Pen,12,10
+5040,Pencil,15,5
+5041,Bad Zero Quantity,0,20
+5042,Bad Negative Quantity,-2,20
+5043,Bad Fraction Quantity,2.5,20
+5044,Bad Text Quantity,abc,20
+5045,Bad Missing Quantity,,20
+5046,Bad Zero Price,2,0
+5047,Bad Negative Price,2,-10
+5048,Bad Text Price,2,xyz
+5049,Bad Missing Price,2,
+5050,,2,20
+5051,   ,1,20
+5052,Bad Multiple Errors,-1,nope
+5001,Duplicate Notebook,3,55
+5012,Duplicate Pen,2,12
+5053,Invalid first duplicate,0,10
+5053,Valid later same ID,2,10
+5054,Notebook,3,50
+5055,Pen,7,10
+5056,School Shoes,2,650
+5057,School Bag,1,850
+5058,Calculator,2,350
+5059,Drawing Book,1,80
+5060,Water Bottle,4,120

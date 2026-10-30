@@ -1,0 +1,23 @@
+# Generated reports and test-run outputs
+output/
+reports/
+results_*/
+
+# Generated CSV reports
+sales_processed.csv
+sales_errors.csv
+summary.csv
+
+# Python-generated cache files
+__pycache__/
+*.py[cod]
+
+# Local environment and secrets
+.env
+.venv/
+venv/
+# Small temporary test files
+/sales.csv
+/October Sales.csv
+/Test Sales.csv
+/check.csv
