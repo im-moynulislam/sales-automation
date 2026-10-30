@@ -55,8 +55,10 @@ def create_sales_report(input_file, output_folder):
 
     # print("Invalid or missing prices:", invalid_price.sum())
 
+    product_text = df["product"].astype("string").fillna("")
 
-    invalid_products = df["product"].isna() | (df["product"].str.strip() == "")
+    invalid_products = product_text.str.strip() == ""
+    
     # print("Invalid products:", invalid_products.sum())
 
     invalid_data = (
@@ -172,11 +174,6 @@ def create_sales_report(input_file, output_folder):
     else:
         highest_revenue_product = revenue_by_product.idxmax()
         most_units_sold_product = units_by_product.idxmax()
-
-
-    print("Valid DataFrame empty:", valid_df.empty)
-    print("Highest revenue product:", repr(highest_revenue_product))
-    print("Most units sold product:", repr(most_units_sold_product))
 
 
    
