@@ -68,3 +68,4 @@ The exact output location depends on the output folder supplied when running the
 
 This is a learning and development project. The program is being improved incrementally, with testing and error handling used to make it more reliable.
 This project is maintained using Git for version control and GitHub for remote storage.
+Future improvements will include automated tests and batch processing.
