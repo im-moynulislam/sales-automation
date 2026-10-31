@@ -25,11 +25,15 @@ def validate_sales_data(df):
    product_text = df["product"].astype("string").fillna("")
 
    invalid_products = product_text.str.strip() == ""
+   order_id_text = df["order_id"].astype("string").fillna("")
+
+   invalid_order_ids = order_id_text.str.strip() == ""
 
    invalid_data = (
                         invalid_quantity
                         | invalid_price
                         | invalid_products
+                        | invalid_order_ids
                     )
    valid_candidates = df[~invalid_data]
 
@@ -45,6 +49,7 @@ def validate_sales_data(df):
                     "invalid_price": invalid_price,
                     "invalid_products": invalid_products,
                     "invalid_duplicates": invalid_duplicates,
+                    "invalid_order_ids": invalid_order_ids
                 }
 
 
@@ -83,7 +88,7 @@ def calculate_sales_summary(valid_df):
         "most_units_sold_product": most_units_sold_product,
     }
 
-def get_error_reason(row, invalid_quantity, invalid_price, invalid_products, invalid_duplicates):
+def get_error_reason(row, invalid_quantity, invalid_price, invalid_products, invalid_duplicates, invalid_order_ids):
     reasons = []
 
     if invalid_quantity.loc[row.name]:
@@ -95,9 +100,14 @@ def get_error_reason(row, invalid_quantity, invalid_price, invalid_products, inv
     if invalid_products.loc[row.name]:
         reasons.append("Missing product")
 
+    if invalid_order_ids.loc[row.name]:
+        reasons.append("Missing order ID")
+    
+
     if row.name in invalid_duplicates.index:
         reasons.append("Duplicate order ID")
 
+    
     return "; ".join(reasons)
 
 def export_sales_reports(valid_df, invalid_df, export_summary, output_path):
@@ -112,7 +122,10 @@ def create_sales_report(input_file, output_folder):
     output_path.mkdir(parents=True, exist_ok=True)
 
     try:
-        df = pd.read_csv(input_file)
+        df = pd.read_csv(
+    input_file,
+    dtype={"order_id": "string"}
+)
     except FileNotFoundError:
         print(f"Error: Could not find '{input_file}'.")
         return
@@ -123,7 +136,7 @@ def create_sales_report(input_file, output_folder):
         print(f"Error: '{input_file}' has headers but no sales records.")
         return
 
-
+    df.columns = df.columns.str.strip()
     required_columns = {
         "order_id",
         "product",
@@ -136,21 +149,18 @@ def create_sales_report(input_file, output_folder):
     if missing_columns:
         print(f"Error: Missing required columns: {sorted(missing_columns)}")
         return
-
+    df["order_id"] = df["order_id"].str.strip()
+    df["product"] = df["product"].astype("string").str.strip()
     validation = validate_sales_data(df)
 
     invalid_rows = validation["invalid_rows"]
     invalid_quantity = validation["invalid_quantity"]
     invalid_price = validation["invalid_price"]
     invalid_products = validation["invalid_products"]
+    invalid_order_ids = validation["invalid_order_ids"]
     invalid_duplicates = validation["invalid_duplicates"]
 
-    # print("Total rows:", len(df))
-    # print("Invalid data rows:", int(invalid_data.sum()))
-    # print("Duplicate valid IDs:", int(duplicate_ids.sum()))
-    # print("Invalid rows:", int(invalid_rows.sum()))
-
-
+    
     valid_df = df.loc[~invalid_rows].copy()
     valid_df["quantity"] = pd.to_numeric(valid_df["quantity"])
     valid_df["price"] = pd.to_numeric(valid_df["price"])
@@ -172,6 +182,7 @@ def create_sales_report(input_file, output_folder):
             invalid_price,
             invalid_products,
             invalid_duplicates,
+            invalid_order_ids
         ),
     )
         
@@ -200,9 +211,7 @@ def create_sales_report(input_file, output_folder):
             output_path,
         )
             
-    print("Summary columns:", export_summary.columns.tolist())
-    print("Highest revenue value:", repr(export_summary.loc[0, "Highest Revenue Product"]))
-    print("Most units value:", repr(export_summary.loc[0, "Most Units Sold Product"]))
+    
     print(export_summary.to_string(index=False))
 
     

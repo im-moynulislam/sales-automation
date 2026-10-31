@@ -80,16 +80,16 @@ invalid_df["error_reason"] = invalid_df.apply(
     get_error_reason, axis=1
 )
 
-invalid_df.to_csv("sales_errors.csv", index=False)
+invalid_df.to_csv(output_path / "sales_errors.csv", index=False)
 
 
 #
-export_valid_df = valid_df.to_csv("sales_processed.csv", index=False)
+export_valid_df = valid_df.to_csv(output_path / "sales_processed.csv", index=False)
 
 
 
-processed_check = pd.read_csv("sales_processed.csv")
-errors_check = pd.read_csv("sales_errors.csv")
+processed_check = pd.read_csv(output_path / "sales_processed.csv")
+errors_check = pd.read_csv(output_path / "sales_errors.csv")
 
 
 total_revenue = valid_df["total_price"].sum()

@@ -99,13 +99,13 @@ def test_missing_product_is_rejected(tmp_path, product):
     assert len(processed) == 0
     assert len(errors) == 1
     assert errors.loc[0, "error_reason"] == "Missing product"
-def test_missing_product_is_rejected(tmp_path):
+def test_missing_products_is_rejected(tmp_path):
     input_file = tmp_path / "sales.csv"
     output_folder = tmp_path / "output"
 
     df = pd.DataFrame({
         "order_id": [104],
-        "product": [""],
+        "product": ["   "],
         "quantity": [2],
         "price": [500]
     })
@@ -230,3 +230,222 @@ def test_all_records_invalid(tmp_path):
     assert len(errors) == 2
     assert summary.loc[0, "Valid Records"] == 0
     assert summary.loc[0, "Invalid Records"] == 2
+    
+
+    
+def test_clean_column_whitespace(tmp_path):
+    csv_file = tmp_path / "sales.csv"
+
+    csv_file.write_text(
+        "order_id, product ,quantity, price \n"
+        "101,Keyboard,2,50\n"
+    )
+
+    df = pd.read_csv(csv_file)
+    df.columns = df.columns.str.strip()
+
+    assert list(df.columns) == [
+        "order_id",
+        "product",
+        "quantity",
+        "price"
+    ]
+
+def test_create_sales_report_with_whitespace_columns(tmp_path):
+    input_file = tmp_path / "sales.csv"
+    output_folder = tmp_path / "reports"
+
+    input_file.write_text(
+    "order_id, product ,quantity, price \n"
+    "101,Keyboard,2,50\n"
+    "101,Mouse,1,30\n"
+)
+    create_sales_report(input_file, output_folder)
+
+    assert (output_folder / "sales_processed.csv").exists()
+    assert (output_folder / "sales_errors.csv").exists()
+    assert (output_folder / "summary.csv").exists()
+    processed_df = pd.read_csv(output_folder / "sales_processed.csv")
+
+    assert len(processed_df) == 1
+    assert processed_df.loc[0, "order_id"] == 101
+    assert processed_df.loc[0, "product"] == "Keyboard"
+    
+
+    errors_df = pd.read_csv(output_folder / "sales_errors.csv")
+
+    assert len(errors_df) == 1
+    assert errors_df.loc[0, "order_id"] == 101
+    assert "duplicate" in errors_df.loc[0, "error_reason"].lower()
+
+
+
+def test_missing_order_id_is_rejected(tmp_path):
+    input_file = tmp_path / "sales.csv"
+    output_folder = tmp_path / "output"
+
+    df = pd.DataFrame({
+        "order_id": [None, 102],
+        "product": ["Laptop", "Mouse"],
+        "quantity": [2, 1],
+        "price": [500, 20]
+    })
+
+    df.to_csv(input_file, index=False)
+
+    create_sales_report(input_file, output_folder)
+
+    processed = pd.read_csv(output_folder / "sales_processed.csv")
+    errors = pd.read_csv(output_folder / "sales_errors.csv")
+
+    assert len(processed) == 1
+    assert len(errors) == 1
+    assert pd.isna(errors.loc[0, "order_id"])
+
+def test_whitespace_order_id_is_rejected(tmp_path):
+    input_file = tmp_path / "sales.csv"
+    output_folder = tmp_path / "output"
+
+    df = pd.DataFrame({
+        "order_id": ["   ", 102],
+        "product": ["Laptop", "Mouse"],
+        "quantity": [2, 1],
+        "price": [500, 20]
+    })
+
+    df.to_csv(input_file, index=False)
+
+    create_sales_report(input_file, output_folder)
+
+    processed = pd.read_csv(output_folder / "sales_processed.csv")
+    errors = pd.read_csv(output_folder / "sales_errors.csv")
+
+    assert len(processed) == 1
+    assert len(errors) == 1
+    assert errors.loc[0, "error_reason"] == "Missing order ID"
+def test_order_ids_with_whitespace_are_duplicates(tmp_path):
+
+    input_file = tmp_path / "sales.csv"
+    output_folder = tmp_path / "output"
+
+    input_file.write_text(
+        "order_id,product,quantity,price\n"
+        "101,Laptop,2,500\n"
+        "101 ,Mouse,1,20\n"
+    )
+
+    create_sales_report(input_file, output_folder)
+
+    processed = pd.read_csv(output_folder / "sales_processed.csv")
+    errors = pd.read_csv(output_folder / "sales_errors.csv")
+
+    assert len(processed) == 1
+    assert len(errors) == 1
+    assert errors.loc[0, "error_reason"] == "Duplicate order ID"
+
+def test_alphanumeric_order_id_is_accepted(tmp_path):
+    input_file = tmp_path / "sales.csv"
+    output_folder = tmp_path / "output"
+
+    df = pd.DataFrame({
+        "order_id": ["ORD101"],
+        "product": ["Laptop"],
+        "quantity": [2],
+        "price": [500]
+    })
+
+    df.to_csv(input_file, index=False)
+
+    create_sales_report(input_file, output_folder)
+
+    processed = pd.read_csv(output_folder / "sales_processed.csv")
+    errors = pd.read_csv(output_folder / "sales_errors.csv")
+
+    assert len(processed) == 1
+    assert processed.loc[0, "order_id"] == "ORD101"
+    assert len(errors) == 0
+
+@pytest.mark.parametrize(
+    "order_id, should_be_valid",
+    [
+        ("101", True),
+        ("00101", True),
+        ("ORD101", True),
+        ("BD-ORD-2026-001", True),
+        ("", False),
+        ("   ", False),
+        (None, False),
+    ]
+)
+def test_order_id_formats(tmp_path, order_id, should_be_valid):
+    input_file = tmp_path / "sales.csv"
+    output_folder = tmp_path / "output"
+
+    df = pd.DataFrame({
+        "order_id": [order_id],
+        "product": ["Laptop"],
+        "quantity": [2],
+        "price": [500]
+    })
+
+    df.to_csv(input_file, index=False)
+
+    create_sales_report(input_file, output_folder)
+
+    processed = pd.read_csv(
+        output_folder / "sales_processed.csv",
+        dtype={"order_id": "string"}
+    )
+    errors = pd.read_csv(output_folder / "sales_errors.csv")
+
+    if should_be_valid:
+        assert len(processed) == 1
+        assert processed.loc[0, "order_id"] == order_id
+        assert len(errors) == 0
+    else:
+        assert len(processed) == 0
+        assert len(errors) == 1
+        assert errors.loc[0, "error_reason"] == "Missing order ID"
+
+
+def test_missing_order_id_column_with_data_rows(tmp_path, capsys):
+    input_file = tmp_path / "sales.csv"
+    output_folder = tmp_path / "output"
+
+    input_file.write_text(
+        "product,quantity,price\n"
+        "Laptop,2,500\n"
+        "Mouse,1,20\n"
+    )
+
+    create_sales_report(input_file, output_folder)
+
+    captured = capsys.readouterr()
+
+    assert "Missing required columns" in captured.out
+    assert "order_id" in captured.out
+
+    assert not (output_folder / "sales_processed.csv").exists()
+    assert not (output_folder / "sales_errors.csv").exists()
+    assert not (output_folder / "summary.csv").exists()
+
+
+def test_product_whitespace_is_normalized_in_summary(tmp_path):
+    input_file = tmp_path / "sales.csv"
+    output_folder = tmp_path / "output"
+
+    input_file.write_text(
+        "order_id,product,quantity,price\n"
+        "101,Laptop,2,500\n"
+        "102, Laptop ,1,300\n"
+    )
+
+    create_sales_report(input_file, output_folder)
+
+    processed = pd.read_csv(output_folder / "sales_processed.csv")
+    summary = pd.read_csv(output_folder / "summary.csv")
+
+    assert len(processed) == 2
+    assert processed["product"].tolist() == ["Laptop", "Laptop"]
+    assert summary.loc[0, "Total Revenue"] == 1300
+    assert summary.loc[0, "Highest Revenue Product"] == "Laptop"
