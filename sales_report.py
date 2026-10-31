@@ -2,6 +2,110 @@ from pathlib import Path
 import pandas as pd
 import argparse
 
+def validate_sales_data(df):
+   
+   
+   quantity_numeric = pd.to_numeric(df["quantity"], errors="coerce")
+
+   invalid_quantity = (
+                        quantity_numeric.isna()
+                        | (quantity_numeric <= 0)
+                        | (quantity_numeric % 1 != 0)
+                    )
+
+   price_numeric = pd.to_numeric(
+                        df["price"], errors="coerce"
+                    )
+
+   invalid_price = (
+                        (price_numeric <= 0) |
+                        price_numeric.isna()
+                    )
+
+   product_text = df["product"].astype("string").fillna("")
+
+   invalid_products = product_text.str.strip() == ""
+
+   invalid_data = (
+                        invalid_quantity
+                        | invalid_price
+                        | invalid_products
+                    )
+   valid_candidates = df[~invalid_data]
+
+   duplicate_ids = valid_candidates["order_id"].duplicated(keep="first")
+   invalid_duplicates = valid_candidates[duplicate_ids].copy()
+
+   invalid_rows = invalid_data.copy()
+   invalid_rows.loc[invalid_duplicates.index] = True
+
+   return {
+                    "invalid_rows": invalid_rows,
+                    "invalid_quantity": invalid_quantity,
+                    "invalid_price": invalid_price,
+                    "invalid_products": invalid_products,
+                    "invalid_duplicates": invalid_duplicates,
+                }
+
+
+def calculate_sales_summary(valid_df):
+    total_revenue = valid_df["total_price"].sum()
+
+    revenue_by_product = (
+        valid_df.groupby("product")["total_price"]
+        .sum()
+        .sort_values(ascending=False)
+    )
+
+    units_by_product = (
+        valid_df.groupby("product")["quantity"]
+        .sum()
+        .sort_values(ascending=False)
+    )
+
+    average_sale_value = (
+        total_revenue / len(valid_df)
+        if not valid_df.empty
+        else 0
+    )
+
+    if valid_df.empty:
+        highest_revenue_product = "N/A"
+        most_units_sold_product = "N/A"
+    else:
+        highest_revenue_product = revenue_by_product.idxmax()
+        most_units_sold_product = units_by_product.idxmax()
+
+    return {
+        "total_revenue": total_revenue,
+        "average_sale_value": average_sale_value,
+        "highest_revenue_product": highest_revenue_product,
+        "most_units_sold_product": most_units_sold_product,
+    }
+
+def get_error_reason(row, invalid_quantity, invalid_price, invalid_products, invalid_duplicates):
+    reasons = []
+
+    if invalid_quantity.loc[row.name]:
+        reasons.append("Invalid quantity")
+
+    if invalid_price.loc[row.name]:
+        reasons.append("Invalid price")
+
+    if invalid_products.loc[row.name]:
+        reasons.append("Missing product")
+
+    if row.name in invalid_duplicates.index:
+        reasons.append("Duplicate order ID")
+
+    return "; ".join(reasons)
+
+def export_sales_reports(valid_df, invalid_df, export_summary, output_path):
+    invalid_df.to_csv(output_path / "sales_errors.csv", index=False)
+    valid_df.to_csv(output_path / "sales_processed.csv", index=False)
+    export_summary.to_csv(output_path / "summary.csv", index=False)
+
+
 
 def create_sales_report(input_file, output_folder):
     output_path = Path(output_folder)
@@ -33,61 +137,18 @@ def create_sales_report(input_file, output_folder):
         print(f"Error: Missing required columns: {sorted(missing_columns)}")
         return
 
-    
-    quantity_numeric = pd.to_numeric(df["quantity"], errors="coerce")
+    validation = validate_sales_data(df)
 
-    invalid_quantity = (
-        quantity_numeric.isna()
-        | (quantity_numeric <= 0)
-        | (quantity_numeric % 1 != 0)
-    )
-    # print(df[invalid_quantity])
-    # print("Invalid or missing quantities:", invalid_quantity.sum())
+    invalid_rows = validation["invalid_rows"]
+    invalid_quantity = validation["invalid_quantity"]
+    invalid_price = validation["invalid_price"]
+    invalid_products = validation["invalid_products"]
+    invalid_duplicates = validation["invalid_duplicates"]
 
-    price_numeric = pd.to_numeric(
-        df["price"], errors="coerce"
-    )
-
-    invalid_price = (
-        (price_numeric <= 0) |
-        price_numeric.isna()
-    )
-
-    # print("Invalid or missing prices:", invalid_price.sum())
-
-    product_text = df["product"].astype("string").fillna("")
-
-    invalid_products = product_text.str.strip() == ""
-    
-    # print("Invalid products:", invalid_products.sum())
-
-    invalid_data = (
-        invalid_quantity
-        | invalid_price
-        | invalid_products
-    )
-    valid_candidates = df[~invalid_data]
-
-
-
-    duplicate_ids = valid_candidates["order_id"].duplicated(keep="first")
-    invalid_duplicates = valid_candidates[duplicate_ids].copy()
-    # print("Duplicate rows:", duplicate_ids.sum())
-
-    # invalid_rows = invalid_quantity | invalid_price | invalid_products | duplicate_ids
-
-    invalid_rows = invalid_data.copy()
-
-    invalid_rows.loc[invalid_duplicates.index] = True
-
-
-    invalid_candidates = df[invalid_data]
-    # print("Valid candidates:", len(valid_candidates))
-
-    print("Total rows:", len(df))
-    print("Invalid data rows:", int(invalid_data.sum()))
-    print("Duplicate valid IDs:", int(duplicate_ids.sum()))
-    print("Invalid rows:", int(invalid_rows.sum()))
+    # print("Total rows:", len(df))
+    # print("Invalid data rows:", int(invalid_data.sum()))
+    # print("Duplicate valid IDs:", int(duplicate_ids.sum()))
+    # print("Invalid rows:", int(invalid_rows.sum()))
 
 
     valid_df = df.loc[~invalid_rows].copy()
@@ -97,84 +158,31 @@ def create_sales_report(input_file, output_folder):
 
     invalid_df = df.loc[invalid_rows].copy()
 
-    def get_error_reason(row):
-        reasons = []
-
-        if invalid_quantity.loc[row.name]:
-            reasons.append("Invalid quantity")
-
-        if invalid_price.loc[row.name]:
-            reasons.append("Invalid price")
-
-        if invalid_products.loc[row.name]:
-            reasons.append("Missing product")
-
-        if row.name in invalid_duplicates.index:
-            reasons.append("Duplicate order ID")
-
-        return "; ".join(reasons)
+    
 
 
     if invalid_df.empty:
         invalid_df["error_reason"] = pd.Series(dtype="object")
     else:
         invalid_df["error_reason"] = invalid_df.apply(
-            get_error_reason, axis=1
-        )
-
+        get_error_reason,
+        axis=1,
+        args=(
+            invalid_quantity,
+            invalid_price,
+            invalid_products,
+            invalid_duplicates,
+        ),
+    )
         
-    # print("Invalid DataFrame shape:", invalid_df.shape)
-    # print("Invalid DataFrame columns:", invalid_df.columns.tolist())
-    # print("Duplicate columns:", invalid_df.columns[invalid_df.columns.duplicated()].tolist())
-    # print("Result type:", type(result))
-    # print(result)
+    
+        
 
-    # print("Result type:", type(result))
-    # print(result)
-
-    # invalid_df["error_reason"] = result
-
-    invalid_df.to_csv(output_path / "sales_errors.csv", index=False)
-
-    valid_df.to_csv(output_path / "sales_processed.csv", index=False)
-
-
-
-
-    processed_check = pd.read_csv(output_path / "sales_processed.csv")
-    errors_check = pd.read_csv(output_path / "sales_errors.csv")
-
-
-    total_revenue = valid_df["total_price"].sum()
-
-
-    revenue_by_product = (
-        valid_df.groupby("product")["total_price"]
-        .sum()
-        .sort_values(ascending=False)
-    )
-
-
-    units_by_product = (
-        valid_df.groupby("product")["quantity"]
-        .sum().sort_values(ascending=False)
-        # Sum quantities and sort from highest to lowest
-    )
-
-    average_sale_value = (
-    total_revenue / len(valid_df)
-    if not valid_df.empty
-    else 0
-)
-    # print("Average sale value:", average_sale_value)
-
-    if valid_df.empty:
-        highest_revenue_product = "N/A"
-        most_units_sold_product = "N/A"
-    else:
-        highest_revenue_product = revenue_by_product.idxmax()
-        most_units_sold_product = units_by_product.idxmax()
-
+    summary = calculate_sales_summary(valid_df)
+    total_revenue = summary["total_revenue"]
+    average_sale_value = summary["average_sale_value"]
+    highest_revenue_product = summary["highest_revenue_product"]
+    most_units_sold_product = summary["most_units_sold_product"]
 
    
     export_summary = pd.DataFrame({
@@ -185,20 +193,23 @@ def create_sales_report(input_file, output_folder):
         "Highest Revenue Product": [highest_revenue_product],
         "Most Units Sold Product": [most_units_sold_product]
     })
+    export_sales_reports(
+            valid_df,
+            invalid_df,
+            export_summary,
+            output_path,
+        )
+            
     print("Summary columns:", export_summary.columns.tolist())
     print("Highest revenue value:", repr(export_summary.loc[0, "Highest Revenue Product"]))
     print("Most units value:", repr(export_summary.loc[0, "Most Units Sold Product"]))
     print(export_summary.to_string(index=False))
 
-    export_summary.to_csv(output_path / "summary.csv", index=False)
+    
 
-    summary_check = pd.read_csv(output_path / "summary.csv", keep_default_na=False)
-    print(summary_check)
+    
 
-
-        # Move your completed Pandas workflow here.
-        # Export files using output_path / "filename.csv"
-    processed_check = pd.read_csv(output_path / "sales_processed.csv")
+       
 
     print(
         f"Report complete: {len(valid_df)} valid, "
@@ -223,5 +234,6 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+    
 
     create_sales_report(args.input_file, args.output_folder)
