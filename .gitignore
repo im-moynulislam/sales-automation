@@ -21,3 +21,4 @@ venv/
 /October Sales.csv
 /Test Sales.csv
 /check.csv
+/.env
